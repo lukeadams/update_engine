@@ -5,8 +5,6 @@
 
 set -e
 
-OEM_MNT="/usr/share/oem"
-
 INSTALL_MNT=$(dirname "$0")
 INSTALL_DEV="$1"
 
@@ -65,18 +63,31 @@ cp -v "${INSTALL_MNT}/boot/syslinux/root.${SLOT}.cfg" \
     "${ESP_MNT}/syslinux/root.${SLOT}.cfg"
 
 # For Xen's pvgrub
-cp -v "${INSTALL_MNT}/boot/grub/menu.lst.${SLOT}" \
+# Check if special pvgrub kernel flags (coreos.core_esp=(hd1,0) & coreos.pvgrub_part=/dev/xvda) are set
+# WARNING: user setting incorrect values can render the system unbootable
+REAL_ESP=GetKernelFlag('coreos.core_esp')
+PVGRUB_PART=GetKernelFlag('coreos.pvgrub_part')
+# Check if special pvgrub kernel flags (coreos.core_esp=(hd1,0) & coreos.pvgrub_part=/dev/xvda) are set
+if REAL_ESP && PVGRUB_PART then
+    #copy menu.lst to temp dir for edits
+    cp -v "${INSTALL_MNT}/boot/grub/menu.lst.${SLOT}" /tmp/boot/grub/menu.lst
+    
+    #edit the file, adding the correct locations
+    
+    #add the kernel flags
+    
+    
+    cp -v /tmp/boot/grub/menu.lst \
+    "${PVGRUB_PART}/boot/grub/menu.lst"
+else
+    #use the normal PV-GRUB stuff:
+    cp -v "${INSTALL_MNT}/boot/grub/menu.lst.${SLOT}" \
     "${ESP_MNT}/boot/grub/menu.lst"
 
 # For Xen HVM, the default boot_kernel w/ kexec doesn't work
 if [[ $(systemd-detect-virt) == xen ]]; then
     cp -v "${INSTALL_MNT}/boot/syslinux/default.cfg.${SLOT}" \
         "${ESP_MNT}/syslinux/default.cfg"
-fi
-
-# If the OEM provides a hook, call it
-if [[ -x "${OEM_MNT}/bin/oem-postinst" ]]; then
-    "${OEM_MNT}/bin/oem-postinst" "${SLOT}" "${INSTALL_MNT}"
 fi
 
 # use the cgpt binary from the image to ensure compatibility
